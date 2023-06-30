@@ -4,7 +4,7 @@ import os.path as osp
 from PIL import Image
 import torch
 import cv2
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, ToPILImage, PILToTensor
 from tqdm.auto import tqdm
 
 class ImgCapDataset(Dataset):
@@ -19,16 +19,20 @@ class ImgCapDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        img = cv2.cvtColor(cv2.imread(self.files[idx],cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+        # img = cv2.cvtColor(cv2.imread(self.files[idx],cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+        img = Image.open(self.files[idx])
         if self.transform:
             img = torch.from_numpy(self.transform(img).pixel_values[0])
         else:
-            img = ToTensor()(img)
+            img = PILToTensor()(img)
             if (len(img.shape) == 2):
                 img = img.unsqueeze(0)
                 img = img.repeat((3, 1, 1))
             if (img.shape[0] == 1):
                 img = img.repeat((3, 1, 1))
+            if (img.shape[0] == 4):
+                img = img[:3, ...]
+        assert(img.shape[0]==3), f"got {img.shape}"
         fname = osp.basename(self.files[idx])
         
         return img, fname
