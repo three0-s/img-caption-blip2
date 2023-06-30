@@ -4,7 +4,7 @@ import os.path as osp
 from PIL import Image
 import torch
 import cv2
-from torchvision.transforms import ToTensor, ToPILImage, PILToTensor
+from torchvision.transforms import Resize, PILToTensor
 from tqdm.auto import tqdm
 
 class ImgCapDataset(Dataset):
@@ -25,6 +25,7 @@ class ImgCapDataset(Dataset):
             img = torch.from_numpy(self.transform(img).pixel_values[0])
         else:
             img = PILToTensor()(img)
+            img = Resize((680, 1024))(img)
             if (len(img.shape) == 2):
                 img = img.unsqueeze(0)
                 img = img.repeat((3, 1, 1))
