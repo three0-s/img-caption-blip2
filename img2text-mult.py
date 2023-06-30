@@ -35,39 +35,39 @@ def main(opts):
     model = DDP(model, delay_allreduce=True).cuda(opts.local_rank)
     dataset = ImgCapDataset('/workspace/img-caption-blip2/open-images/')
     sampler = DistributedSampler(dataset=dataset, shuffle=False)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=False, drop_last=False, pin_memory=False, sampler=sampler)
+    dataloader = DataLoader(dataset, batch_size=64, shuffle=False, drop_last=False, pin_memory=False, sampler=sampler)
     device = torch.device(f"cuda:{opts.local_rank}")
 
     try:
         for i, (img, fname) in enumerate(tqdm(dataloader)):
             prompt = ["A photography of "]*img.shape[0]
-            inputs = processor(img, text=prompt, return_tensors="pt").to(device, torch.float16)
+            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
             generated_ids = model.generate(**inputs, max_new_tokens=20)
             generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
             
             prompt = [f"{prompt[i]}{generated_text[i]}, where " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt").to(device, torch.float16)
+            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
             generated_ids = model.generate(**inputs, max_new_tokens=20)
             generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
             
 
 
             prompt = [f"{prompt[i]}{generated_text[i]}. The vibe of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt").to(device, torch.float16)
+            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
             generated_ids = model.generate(**inputs, max_new_tokens=20)
             generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
             
 
 
             prompt = [f"{prompt[i]}{generated_text[i]}. The saturation of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt").to(device, torch.float16)
+            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
             generated_ids = model.generate(**inputs, max_new_tokens=20)
             generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
         
 
 
             prompt = [f"{prompt[i]}{generated_text[i]}. And the brightness of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt").to(device, torch.float16)
+            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
             generated_ids = model.generate(**inputs, max_new_tokens=20)
             generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
 
@@ -75,12 +75,16 @@ def main(opts):
             for i in range(img.shape[0]):
                 result[fname[i]] = ret[i]
 
-            if (opts.local_rank==0 and i%10000 == 0):
+            if ((i/31)%10000 == 0):
                 with open('result.json', 'w') as fp:
                     json.dump(result, fp)
     except:
         with open('result.json', 'w') as fp:
             json.dump(result, fp)
+
+    with open('result.json', 'w') as fp:
+            json.dump(result, fp)
+
 
 
 
