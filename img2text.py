@@ -33,7 +33,7 @@ def main(opts):
 
     # model.cuda(opts.local_rank)
     model = DDP(model, delay_allreduce=True).cuda(opts.local_rank)
-    dataset = ImgCapDataset('/workspace/img-caption/open-images/imgs/train_0')
+    dataset = ImgCapDataset('/workspace/img-caption-blip2/open-images/')
     sampler = DistributedSampler(dataset=dataset, shuffle=False)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=False, drop_last=False, pin_memory=False, sampler=sampler)
     device = torch.device(f"cuda:{opts.local_rank}")
