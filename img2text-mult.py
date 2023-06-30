@@ -29,60 +29,68 @@ def main(opts):
     result = dict()
     opts.world_size = torch.distributed.get_world_size()
     processor = AutoProcessor.from_pretrained("Salesforce/blip2-flan-t5-xl")
-    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-flan-t5-xl", load_in_8bit=True, device_map=f"cuda:{opts.local_rank}")
+    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-flan-t5-xl", torch_dtype=torch.float16, device_map=f"cuda:{opts.local_rank}")
 
     # model.cuda(opts.local_rank)
     model = DDP(model, delay_allreduce=True).cuda(opts.local_rank)
-    dataset = ImgCapDataset('/workspace/img-caption-blip2/open-images/')
+    dataset = ImgCapDataset('/workspace/img-caption-blip2/open-images/imgs/')
     sampler = DistributedSampler(dataset=dataset, shuffle=False)
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=False, drop_last=False, pin_memory=False, sampler=sampler)
+    dataloader = DataLoader(dataset, batch_size=256, shuffle=False, drop_last=False, pin_memory=True, sampler=sampler, num_workers=4)
     device = torch.device(f"cuda:{opts.local_rank}")
 
     try:
         for i, (img, fname) in enumerate(tqdm(dataloader)):
-            prompt = ["A photography of "]*img.shape[0]
-            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
-            generated_ids = model.generate(**inputs, max_new_tokens=20)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+            with torch.autocast('cuda'):
+                prompt = ["A photography of "]*img.shape[0]
+                inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
+                
+                generated_ids = model.module.generate(**inputs, max_new_tokens=50)
+                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
             
-            prompt = [f"{prompt[i]}{generated_text[i]}, where " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
-            generated_ids = model.generate(**inputs, max_new_tokens=20)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
-            
-
-
-            prompt = [f"{prompt[i]}{generated_text[i]}. The vibe of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
-            generated_ids = model.generate(**inputs, max_new_tokens=20)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+                prompt = [f"{prompt[i]}{generated_text[i]}, where " for i in range(img.shape[0])]
+                inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
+            # with torch.autocast('cuda'):
+                generated_ids = model.module.generate(**inputs, max_new_tokens=50)
+                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
             
 
 
-            prompt = [f"{prompt[i]}{generated_text[i]}. The saturation of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
-            generated_ids = model.generate(**inputs, max_new_tokens=20)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
-        
+            #     prompt = [f"{prompt[i]}{generated_text[i]}. The vibe of this image is " for i in range(img.shape[0])]
+            #     inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
+            # # with torch.autocast('cuda'):
+            #     generated_ids = model.module.generate(**inputs, max_new_tokens=50)
+            #     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+            
 
 
-            prompt = [f"{prompt[i]}{generated_text[i]}. And the brightness of this image is " for i in range(img.shape[0])]
-            inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
-            generated_ids = model.generate(**inputs, max_new_tokens=20)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+            #     prompt = [f"{prompt[i]}{generated_text[i]}. The saturation of this image is " for i in range(img.shape[0])]
+            #     inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
+            # # with torch.autocast('cuda'):
+            #     generated_ids = model.module.generate(**inputs, max_new_tokens=50)
+            #     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+            
 
-            ret = [prompt[i] + generated_text[i] + "." for i in range(img.shape[0])]
-            for i in range(img.shape[0]):
-                result[fname[i]] = ret[i]
 
-            if ((i/31)%10000 == 0):
-                with open('result.json', 'w') as fp:
+            #     prompt = [f"{prompt[i]}{generated_text[i]}. And the brightness of this image is " for i in range(img.shape[0])]
+            #     inputs = processor(img, text=prompt, return_tensors="pt", padding=True).to(device, torch.float16)
+            # # with torch.autocast('cuda'):
+            #     generated_ids = model.module.generate(**inputs, max_new_tokens=50)
+            #     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
+
+                ret = [prompt[i] + generated_text[i] + "." for i in range(img.shape[0])]
+                for i in range(img.shape[0]):
+                    result[fname[i]] = ret[i]
+
+            if (i%10000 == 0):
+                with open(f'result{opts.local_rank}.json', 'w') as fp:
                     json.dump(result, fp)
-    except:
-        with open('result.json', 'w') as fp:
+                
+    except Exception as e:
+        print(e)
+        with open(f'result{opts.local_rank}.json', 'w') as fp:
             json.dump(result, fp)
 
-    with open('result.json', 'w') as fp:
+    with open(f'result{opts.local_rank}.json', 'w') as fp:
             json.dump(result, fp)
 
 

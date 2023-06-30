@@ -25,7 +25,7 @@ class ImgCapDataset(Dataset):
             img = torch.from_numpy(self.transform(img).pixel_values[0])
         else:
             img = PILToTensor()(img)
-            img = Resize((680, 1024))(img)
+            img = Resize((680, 1024), antialias=True)(img)
             if (len(img.shape) == 2):
                 img = img.unsqueeze(0)
                 img = img.repeat((3, 1, 1))
