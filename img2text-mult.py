@@ -13,13 +13,11 @@ import torch.distributed as dist
 
 def get_args_parser():
     parser = argparse.ArgumentParser(add_help=False)
-    # parser.add_argument('--rank', type=int, default=0)
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--gpu_ids', nargs="+", default=['0', '1', '2', '3'])
     parser.add_argument('--world_size', type=int, default=4)
-    # parser.add_argument('--local-rank', dest='local_rank', type=int)
-    # usage : --gpu_ids 0, 1, 2, 3
     return parser
+
 
 def setup_for_distributed(is_master):
     """
